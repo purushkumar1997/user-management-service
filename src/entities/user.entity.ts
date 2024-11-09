@@ -31,4 +31,7 @@ export class User {
 
   @CreateDateColumn()
   registrationDate: Date;
+
+  @Column({ default: true })
+  active: boolean;
 }

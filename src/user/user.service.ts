@@ -52,7 +52,7 @@ export class UserService {
       const existingUserByUsername = await this.userRepository.findOne({
         where: { username: details.username },
       });
-      if (existingUserByUsername) {
+      if (existingUserByUsername && existingUserByUsername.active) {
         throw new HttpException(
           {
             status: HttpStatus.BAD_REQUEST,
@@ -64,7 +64,7 @@ export class UserService {
       const existingUserByEmail = await this.userRepository.findOne({
         where: { email: details.email },
       });
-      if (existingUserByEmail) {
+      if (existingUserByEmail && existingUserByEmail.active) {
         throw new HttpException(
           {
             status: HttpStatus.BAD_REQUEST,
@@ -72,6 +72,33 @@ export class UserService {
           },
           HttpStatus.BAD_REQUEST,
         );
+      }
+      if (
+        existingUserByEmail &&
+        existingUserByUsername &&
+        existingUserByEmail.id !== existingUserByUsername.id
+      ) {
+        throw new HttpException(
+          {
+            status: HttpStatus.BAD_REQUEST,
+            message:
+              'Email and username allready in system by two different users',
+          },
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      if (
+        existingUserByEmail &&
+        existingUserByUsername &&
+        !existingUserByEmail.active &&
+        existingUserByEmail.id === existingUserByUsername.id
+      ) {
+        const toUpdate = {
+          active: true,
+        };
+        Object.assign(existingUserByEmail, toUpdate);
+        return await this.userRepository.save(existingUserByEmail);
       }
       const user: User = this.userRepository.create({
         ...details,
@@ -113,6 +140,7 @@ export class UserService {
       const query = this.userRepository
         .createQueryBuilder('users')
         .select(['users.username', 'users.email', 'users.description'])
+        .where('users.active = :active', { active: true })
         .skip((page - 1) * limit)
         .take(limit)
         .orderBy(`users.${sortBy}`, orderBy);
@@ -189,7 +217,18 @@ export class UserService {
           HttpStatus.BAD_REQUEST,
         );
       }
-      return await this.userRepository.remove(user);
+      if (!user.active) {
+        throw new HttpException(
+          {
+            status: HttpStatus.BAD_REQUEST,
+            message: 'User is allready not active',
+          },
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+      const update = { active: false };
+      Object.assign(user, update);
+      return await this.userRepository.save(user);
     } catch (error) {
       this.logger.error(
         `removeUser failed for with error: ${error.message}`,

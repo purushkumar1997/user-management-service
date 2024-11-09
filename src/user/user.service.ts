@@ -178,17 +178,23 @@ export class UserService {
         .createQueryBuilder('users')
         .leftJoinAndSelect('users.role', 'role')
 
-        .where('users.id = :id', { id: userId });
+        .where('users.id = :id', { id: userId })
+        .andWhere('users.active = :active', { active: true });
 
       const user = await query.getOne();
-      console.log(user.role);
       if (user) {
         return {
           roleName: user.role['name'],
           registrationDate: user['registrationDate'],
         };
       } else {
-        return undefined;
+        throw new HttpException(
+          {
+            status: HttpStatus.BAD_REQUEST,
+            message: 'User not found',
+          },
+          HttpStatus.BAD_REQUEST,
+        );
       }
     } catch (error) {
       this.logger.error(
